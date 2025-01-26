@@ -647,12 +647,17 @@ async def generate_chat_completion(
             trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
         )
 
+        is_aoai = ".openai.azure.com/openai/deployments/" in url
+        query_string = "" if not is_aoai else "?api-version=2024-02-15-preview"
+        auth_header_name = "Authentication" if not is_aoai else "api-key" 
+        auth_header_value = f"Bearer {key}" if not is_aoai else f"{key}"
+
         r = await session.request(
             method="POST",
-            url=f"{url}/chat/completions",
+            url=f"{url}/chat/completions{query_string}",
             data=payload,
             headers={
-                "Authorization": f"Bearer {key}",
+                auth_header_name: auth_header_value,
                 "Content-Type": "application/json",
                 **(
                     {
