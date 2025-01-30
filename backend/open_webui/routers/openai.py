@@ -648,8 +648,13 @@ async def generate_chat_completion(
         )
 
         is_aoai = ".openai.azure.com/openai/deployments/" in url
-        query_string = "" if not is_aoai else "?api-version=2024-02-15-preview"
-        auth_header_name = "Authentication" if not is_aoai else "api-key" 
+        is_aai = ".models.ai.azure.com/" in url
+
+        query_string = ""
+        if is_aoai: query_string = "?api-version=2024-02-15-preview"
+        if is_aai: query_string = "?api-version=2024-05-01-preview"
+
+        auth_header_name = "Authorization" if not is_aoai else "api-key"
         auth_header_value = f"Bearer {key}" if not is_aoai else f"{key}"
 
         r = await session.request(
