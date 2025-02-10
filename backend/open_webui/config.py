@@ -797,6 +797,29 @@ except Exception:
 OPENAI_API_BASE_URL = "https://api.openai.com/v1"
 
 ####################################
+# AZURE
+####################################
+
+ENABLE_AZURE_API = PersistentConfig(
+    "ENABLE_AZURE_API",
+    "azure.enable",
+    os.environ.get("ENABLE_AZURE_API", "True").lower() == "true",
+)
+
+AZURE_API_KEYS = PersistentConfig(
+    "AZURE_API_KEYS", "azure.api_key", os.environ.get("AZURE_API_KEYS", "")
+)
+AZURE_API_BASE_URLS = PersistentConfig(
+    "AZURE_API_BASE_URLS", "azure.api_base_url", os.environ.get("AZURE_API_BASE_URLS", "")
+)
+
+AZURE_API_CONFIGS = PersistentConfig(
+    "AZURE_API_CONFIGS",
+    "azure.api_configs",
+    {},
+)
+
+####################################
 # WEBUI
 ####################################
 

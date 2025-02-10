@@ -20,6 +20,10 @@ from open_webui.socket.main import (
 )
 from open_webui.functions import generate_function_chat_completion
 
+from open_webui.routers.azure import (
+    generate_chat_completion as generate_azure_chat_completion,
+)
+
 from open_webui.routers.openai import (
     generate_chat_completion as generate_openai_chat_completion,
 )
@@ -151,6 +155,10 @@ async def generate_chat_completion(
             )
         else:
             return convert_response_ollama_to_openai(response)
+    elif model["owned_by"] == "azure":
+        return await generate_azure_chat_completion(
+            request=request, form_data=form_data, user=user, bypass_filter=bypass_filter
+        )
     else:
         return await generate_openai_chat_completion(
             request=request, form_data=form_data, user=user, bypass_filter=bypass_filter

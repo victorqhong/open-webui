@@ -52,6 +52,7 @@ from open_webui.socket.main import (
 from open_webui.routers import (
     audio,
     images,
+    azure,
     ollama,
     openai,
     retrieval,
@@ -97,6 +98,11 @@ from open_webui.config import (
     OPENAI_API_BASE_URLS,
     OPENAI_API_KEYS,
     OPENAI_API_CONFIGS,
+    # Azure
+    ENABLE_AZURE_API,
+    AZURE_API_BASE_URLS,
+    AZURE_API_KEYS,
+    AZURE_API_CONFIGS,
     # Image
     AUTOMATIC1111_API_AUTH,
     AUTOMATIC1111_BASE_URL,
@@ -388,6 +394,20 @@ app.state.config.OPENAI_API_KEYS = OPENAI_API_KEYS
 app.state.config.OPENAI_API_CONFIGS = OPENAI_API_CONFIGS
 
 app.state.OPENAI_MODELS = {}
+
+########################################
+#
+# AZURE
+#
+########################################
+
+app.state.config.ENABLE_AZURE_API = ENABLE_AZURE_API
+app.state.config.AZURE_API_BASE_URLS = AZURE_API_BASE_URLS
+app.state.config.AZURE_API_KEYS = AZURE_API_KEYS
+app.state.config.AZURE_API_CONFIGS = AZURE_API_CONFIGS
+
+app.state.AZURE_MODELS = {}
+
 
 ########################################
 #
@@ -746,6 +766,7 @@ app.add_middleware(
 app.mount("/ws", socket_app)
 
 
+app.include_router(azure.router, prefix="/azure", tags=["azure"])
 app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 app.include_router(openai.router, prefix="/openai", tags=["openai"])
 

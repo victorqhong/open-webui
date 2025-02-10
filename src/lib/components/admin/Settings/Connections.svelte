@@ -4,6 +4,7 @@
 
 	const dispatch = createEventDispatcher();
 
+	import { getAzureConfig, updateAzureConfig, getAzureModels } from '$lib/apis/azure';
 	import { getOllamaConfig, updateOllamaConfig } from '$lib/apis/ollama';
 	import { getOpenAIConfig, updateOpenAIConfig, getOpenAIModels } from '$lib/apis/openai';
 	import { getModels as _getModels } from '$lib/apis';
@@ -15,6 +16,7 @@
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Plus from '$lib/components/icons/Plus.svelte';
 
+	import AzureConnection from './Connections/AzureConnection.svelte';
 	import OpenAIConnection from './Connections/OpenAIConnection.svelte';
 	import AddConnectionModal from './Connections/AddConnectionModal.svelte';
 	import OllamaConnection from './Connections/OllamaConnection.svelte';
@@ -27,6 +29,10 @@
 	};
 
 	// External
+	let AZURE_API_BASE_URLS = [''];
+	let AZURE_API_KEYS = [''];
+	let AZURE_API_CONFIGS = {};
+
 	let OLLAMA_BASE_URLS = [''];
 	let OLLAMA_API_CONFIGS = {};
 
@@ -34,12 +40,51 @@
 	let OPENAI_API_BASE_URLS = [''];
 	let OPENAI_API_CONFIGS = {};
 
+	let ENABLE_AZURE_API: null | boolean = null;
 	let ENABLE_OPENAI_API: null | boolean = null;
 	let ENABLE_OLLAMA_API: null | boolean = null;
 
 	let pipelineUrls = {};
+	let showAddAzureConnectionModal = false;
 	let showAddOpenAIConnectionModal = false;
 	let showAddOllamaConnectionModal = false;
+
+	const updateAzureHandler = async () => {
+		if (ENABLE_AZURE_API !== null) {
+			// Remove trailing slashes
+			AZURE_API_BASE_URLS = AZURE_API_BASE_URLS.map((url) => url.replace(/\/$/, ''));
+
+			// Check if API KEYS length is same than API URLS length
+			if (AZURE_API_KEYS.length !== AZURE_API_BASE_URLS.length) {
+				// if there are more keys than urls, remove the extra keys
+				if (AZURE_API_KEYS.length > AZURE_API_BASE_URLS.length) {
+					AZURE_API_KEYS = AZURE_API_KEYS.slice(0, AZURE_API_BASE_URLS.length);
+				}
+
+				// if there are more urls than keys, add empty keys
+				if (AZURE_API_KEYS.length < AZURE_API_BASE_URLS.length) {
+					const diff = AZURE_API_BASE_URLS.length - AZURE_API_KEYS.length;
+					for (let i = 0; i < diff; i++) {
+						AZURE_API_KEYS.push('');
+					}
+				}
+			}
+
+			const res = await updateAzureConfig(localStorage.token, {
+				ENABLE_AZURE_API: ENABLE_AZURE_API,
+				AZURE_API_BASE_URLS: AZURE_API_BASE_URLS,
+				AZURE_API_KEYS: AZURE_API_KEYS,
+				AZURE_API_CONFIGS: AZURE_API_CONFIGS
+			}).catch((error) => {
+				toast.error(`${error}`);
+			});
+
+			if (res) {
+				toast.success($i18n.t('Azure API settings updated'));
+				await models.set(await getModels());
+			}
+		}
+	};
 
 	const updateOpenAIHandler = async () => {
 		if (ENABLE_OPENAI_API !== null) {
@@ -98,6 +143,14 @@
 		}
 	};
 
+	const addAzureConnectionHandler = async (connection) => {
+		AZURE_API_BASE_URLS = [...AZURE_API_BASE_URLS, connection.url];
+		AZURE_API_KEYS = [...AZURE_API_KEYS, connection.key];
+		AZURE_API_CONFIGS[AZURE_API_BASE_URLS.length] = connection.config;
+
+		await updateAzureHandler();
+	};
+
 	const addOpenAIConnectionHandler = async (connection) => {
 		OPENAI_API_BASE_URLS = [...OPENAI_API_BASE_URLS, connection.url];
 		OPENAI_API_KEYS = [...OPENAI_API_KEYS, connection.key];
@@ -115,10 +168,14 @@
 
 	onMount(async () => {
 		if ($user.role === 'admin') {
+			let azureConfig = {};
 			let ollamaConfig = {};
 			let openaiConfig = {};
 
 			await Promise.all([
+				(async () => {
+					azureConfig = await getAzureConfig(localStorage.token);
+				})(),
 				(async () => {
 					ollamaConfig = await getOllamaConfig(localStorage.token);
 				})(),
@@ -127,8 +184,13 @@
 				})()
 			]);
 
+			ENABLE_AZURE_API = azureConfig.ENABLE_AZURE_API
 			ENABLE_OPENAI_API = openaiConfig.ENABLE_OPENAI_API;
 			ENABLE_OLLAMA_API = ollamaConfig.ENABLE_OLLAMA_API;
+
+			AZURE_API_BASE_URLS = azureConfig.AZURE_API_BASE_URLS
+			AZURE_API_CONFIGS = azureConfig.AZURE_API_CONFIGS
+			AZURE_API_KEYS = azureConfig.AZURE_API_KEYS
 
 			OPENAI_API_BASE_URLS = openaiConfig.OPENAI_API_BASE_URLS;
 			OPENAI_API_KEYS = openaiConfig.OPENAI_API_KEYS;
@@ -136,6 +198,27 @@
 
 			OLLAMA_BASE_URLS = ollamaConfig.OLLAMA_BASE_URLS;
 			OLLAMA_API_CONFIGS = ollamaConfig.OLLAMA_API_CONFIGS;
+
+			if (ENABLE_AZURE_API) {
+				// get url and idx
+				for (const [idx, url] of AZURE_API_BASE_URLS.entries()) {
+					if (!AZURE_API_CONFIGS[idx]) {
+						// Legacy support, url as key
+						AZURE_API_CONFIGS[idx] = AZURE_API_CONFIGS[url] || {};
+					}
+				}
+
+				AZURE_API_BASE_URLS.forEach(async (url, idx) => {
+					AZURE_API_CONFIGS[idx] = AZURE_API_CONFIGS[idx] || {};
+					if (!(AZURE_API_CONFIGS[idx]?.enable ?? true)) {
+						return;
+					}
+					const res = await getAzureModels(localStorage.token, idx);
+					if (res.pipelines) {
+						pipelineUrls[url] = true;
+					}
+				});
+			}
 
 			if (ENABLE_OPENAI_API) {
 				// get url and idx
@@ -168,6 +251,11 @@
 		}
 	});
 </script>
+
+<AddConnectionModal
+	bind:show={showAddAzureConnectionModal}
+	onSubmit={addAzureConnectionHandler}
+/>
 
 <AddConnectionModal
 	bind:show={showAddOpenAIConnectionModal}
@@ -318,6 +406,66 @@
 							>
 								{$i18n.t('Click here for help.')}
 							</a>
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<hr class=" border-gray-50 dark:border-gray-850" />
+
+			<div class="pr-1.5 my-2">
+				<div class="flex justify-between items-center text-sm mb-2">
+					<div class="  font-medium">{$i18n.t('Azure API')}</div>
+
+					<div class="mt-1">
+						<Switch
+							bind:state={ENABLE_AZURE_API}
+							on:change={async () => {
+								updateAzureHandler();
+							}}
+						/>
+					</div>
+				</div>
+
+				{#if ENABLE_AZURE_API}
+					<hr class=" border-gray-50 dark:border-gray-850 my-2" />
+
+					<div class="">
+						<div class="flex justify-between items-center">
+							<div class="font-medium">{$i18n.t('Manage Azure API Connections')}</div>
+
+							<Tooltip content={$i18n.t(`Add Connection`)}>
+								<button
+									class="px-1"
+									on:click={() => {
+										showAddAzureConnectionModal = true;
+									}}
+									type="button"
+								>
+									<Plus />
+								</button>
+							</Tooltip>
+						</div>
+
+						<div class="flex w-full gap-1.5">
+							<div class="flex-1 flex flex-col gap-1.5 mt-1.5">
+								{#each AZURE_API_BASE_URLS as url, idx}
+									<AzureConnection
+										bind:url
+										bind:key={AZURE_API_KEYS[idx]}
+										bind:config={AZURE_API_CONFIGS[idx]}
+										{idx}
+										onSubmit={() => {
+											updateAzureHandler();
+										}}
+										onDelete={() => {
+											AZURE_API_BASE_URLS = AZURE_API_BASE_URLS.filter((url, urlIdx) => idx !== urlIdx);
+											AZURE_API_KEYS = AZURE_API_KEYS.filter((key, keyIdx) => idx !== keyIdx);
+											delete AZURE_API_CONFIGS[idx];
+										}}
+									/>
+								{/each}
+							</div>
 						</div>
 					</div>
 				{/if}

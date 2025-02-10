@@ -5,7 +5,7 @@ import sys
 from aiocache import cached
 from fastapi import Request
 
-from open_webui.routers import openai, ollama
+from open_webui.routers import openai, ollama, azure
 from open_webui.functions import get_function_models
 
 
@@ -33,6 +33,7 @@ async def get_all_base_models(request: Request):
     function_models = []
     openai_models = []
     ollama_models = []
+    azure_models = []
 
     if request.app.state.config.ENABLE_OPENAI_API:
         openai_models = await openai.get_all_models(request)
@@ -52,8 +53,12 @@ async def get_all_base_models(request: Request):
             for model in ollama_models["models"]
         ]
 
+    if request.app.state.config.ENABLE_AZURE_API:
+        azure_models = await azure.get_all_models(request)
+        azure_models = azure_models["data"]
+
     function_models = await get_function_models(request)
-    models = function_models + openai_models + ollama_models
+    models = function_models + openai_models + ollama_models + azure_models
 
     return models
 

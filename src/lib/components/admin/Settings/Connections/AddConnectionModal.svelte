@@ -4,6 +4,7 @@
 	const i18n = getContext('i18n');
 
 	import { models } from '$lib/stores';
+	import { verifyAzureConnection } from '$lib/apis/azure';
 	import { verifyOpenAIConnection } from '$lib/apis/openai';
 	import { verifyOllamaConnection } from '$lib/apis/ollama';
 
@@ -21,6 +22,7 @@
 	export let show = false;
 	export let edit = false;
 	export let ollama = false;
+	export let azure = false;
 
 	export let connection = null;
 
@@ -34,6 +36,16 @@
 	let modelIds = [];
 
 	let loading = false;
+
+	const verifyAzureHandler = async () => {
+		const res = await verifyAzureConnection(localStorage.token, url, key).catch((error) => {
+			toast.error(`${error}`);
+		});
+
+		if (res) {
+			toast.success($i18n.t('Server connection verified'));
+		}
+	};
 
 	const verifyOllamaHandler = async () => {
 		const res = await verifyOllamaConnection(localStorage.token, url, key).catch((error) => {
@@ -58,6 +70,8 @@
 	const verifyHandler = () => {
 		if (ollama) {
 			verifyOllamaHandler();
+		} else if (azure) {
+			verifyAzureHandler();
 		} else {
 			verifyOpenAIHandler();
 		}
